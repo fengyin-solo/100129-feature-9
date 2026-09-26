@@ -1,8 +1,9 @@
-"""门到门配送业务规则：状态流转、字段校验与筛选口径都收在这里。"""
+"""门到门配送业务规则：状态流转、字段校验与回单状态同步都收在这里。"""
 from __future__ import annotations
 
 from typing import Any
 
+from app.services import returntrip as receipt_service
 from app.store import store
 
 MODULE = "door"
@@ -26,12 +27,19 @@ class DoorService:
             rows = [row for row in rows if keyword in str(row.get("任务编号", ""))]
         if status:
             rows = [row for row in rows if row.get("status") == status]
+        # 配送记录里展示的「回单状态」直接取自挂在该任务上的那张回单，
+        # 保证配送入口与回单台账、签收弹窗三处结论一致。
+        for row in rows:
+            receipt_service.snapshot_for_task(row)
         total = len(rows)
         start = max(page - 1, 0) * size
         return rows[start:start + size], total
 
     def get_entry(self, entry_id: int) -> dict[str, Any] | None:
-        return store.find(MODULE, entry_id)
+        entry = store.find(MODULE, entry_id)
+        if entry is not None:
+            receipt_service.snapshot_for_task(entry)
+        return entry
 
     def create_entry(self, values: dict[str, Any]) -> tuple[dict[str, Any] | None, list[str]]:
         missing = [field for field in REQUIRED_FIELDS if not str(values.get(field) or "").strip()]
@@ -58,4 +66,8 @@ class DoorService:
         entry["status"] = target
         entry["pending"] = target != STATUS_ORDER[-1]
         entry["abnormal"] = action in NEGATIVE_ACTIONS
+        if action == "完成签收":
+            # 配送侧完成签收后，把同一张回单同步成已签收，避免两个入口状态打架。
+            receipt_service.mark_signed_by_task(str(entry.get("任务编号") or ""))
+        receipt_service.snapshot_for_task(entry)
         return entry, f"配送任务已{action}"

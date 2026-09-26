@@ -5,7 +5,7 @@
 """
 from __future__ import annotations
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
@@ -22,13 +22,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+@app.middleware("http")
+async def persist_after_mutation(request: Request, call_next):
+    """写类请求成功返回后把仓库快照落盘，保证编辑结果重启后仍然留得住。"""
+    response = await call_next(request)
+    if request.method in {"POST", "PUT", "PATCH", "DELETE"} and response.status_code < 400:
+        store.save()
+    return response
+
+
 for module in ROUTERS:
     app.include_router(module.router)
 
 
 @app.get("/api/health")
 def health() -> dict[str, object]:
-    """健康检查：确认服务已经监听、示例数据已经就绪。"""
+    """健康检查：确认服务已经监听、数据已经就绪。"""
     return {"ok": True, "app": settings.app_name, "modules": len(store.module_names())}
 
 

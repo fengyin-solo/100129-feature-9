@@ -70,7 +70,7 @@ import { request } from '@/api/client'
 type Row = Record<string, string | number | null>
 
 const ENDPOINT = '/api/door'
-const columns = ["任务编号", "关联调度", "配送站点", "配送地址", "配送人员", "计划时段", "签收方式", "配送状态"]
+const columns = ["任务编号", "关联调度", "配送站点", "配送地址", "配送人员", "计划时段", "签收方式", "配送状态", "回单状态"]
 const actions = ["开始配送", "确认送达", "完成签收"]
 const statuses = ["待配送", "配送中", "已送达", "已签收"]
 const stats = [{"label": "待配送任务", "value": 0}, {"label": "配送中任务", "value": 0}, {"label": "已签收任务", "value": 0}]
