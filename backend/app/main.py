@@ -5,12 +5,13 @@
 """
 from __future__ import annotations
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
 from app.routers import ROUTERS
-from app.store import store
+from app.store import UPLOAD_DIR, store
 
 app = FastAPI(title="冷链物流运输管理平台", version="1.0.0")
 
@@ -22,8 +23,26 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+@app.middleware("http")
+async def persist_after_mutation(request: Request, call_next):
+    """任何写请求（POST/PUT/PATCH/DELETE）处理完且成功后统一落盘。
+
+    业务层只管改内存数据，持久化口径收在这一处，避免某个接口忘记保存
+    导致“改完当时对、第二天又回去”的问题。GET 等只读请求不触发落盘。
+    """
+    response = await call_next(request)
+    if request.method.upper() in {"POST", "PUT", "PATCH", "DELETE"} and response.status_code < 400:
+        store.persist()
+    return response
+
+
 for module in ROUTERS:
     app.include_router(module.router)
+
+
+# 回单照片等上传文件以静态目录方式暴露，回单记录里保存的是 /uploads/ 下的相对地址
+app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
 
 
 @app.get("/api/health")

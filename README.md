@@ -76,3 +76,13 @@ npm run dev
   `backend/app/routers/<模块>.py`，业务规则在 `backend/app/services/<模块>.py`。
 - 列表接口统一返回 `{ items, total, page, size }`，动作接口统一返回 `{ ok, message }`。
 - 状态流转只允许在 `app/services` 里改，路由层不做业务判断。
+
+## 数据持久化
+
+- 仓库默认把数据落盘在 `backend/data/`（首次启动仍用示例数据播种）：
+  - `store.json`：所有业务表，写请求成功后原子落盘，进程重启不丢编辑结果；
+  - `uploads/`：上传的回单照片等文件，通过 `/uploads/<文件名>` 访问。
+- 可用环境变量 `RETURNTRIP_DATA_DIR` 覆盖数据目录（容器部署时挂卷到该目录即可）。
+- 回单管理额外提供：`PUT /api/returntrip/{id}`（保存签收方/签收日期等编辑）、
+  `POST /api/returntrip/{id}/photo`（上传回单照片）、`GET /api/returntrip/stats`
+  （按状态分组）。回单状态以内部 `status` 为唯一口径，并与门到门配送的签收动作双向联动。

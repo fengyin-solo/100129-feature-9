@@ -30,6 +30,20 @@ def list_entries(
     return PageResult(items=items, total=total, page=page, size=size)
 
 
+@router.get("/stats")
+def status_stats() -> dict[str, Any]:
+    """按配送状态分组统计，口径与列表的内部 status 完全一致。"""
+    return {"module": "door", "items": service.status_stats()}
+
+
+# 注意：/export、/stats 必须排在 /{entry_id} 之前，否则会被当成任务 id 解析
+@router.get("/export")
+def export_entries() -> dict[str, Any]:
+    """导出门到门配送清单：返回当前过滤条件下的全量数据。"""
+    items, total = service.list_entries(page=1, size=10000)
+    return {"module": "door", "total": total, "items": items}
+
+
 @router.get("/{entry_id}", response_model=dict)
 def get_entry(entry_id: int) -> dict:
     """读取单条配送任务明细；不存在时给出可读的错误说明。"""
@@ -56,10 +70,3 @@ def run_action(entry_id: int, payload: EntryPayload) -> ActionResult:
     if entry is None:
         return ActionResult(ok=False, message=message)
     return ActionResult(ok=True, message=message, entry=entry)
-
-
-@router.get("/export")
-def export_entries() -> dict[str, Any]:
-    """导出门到门配送清单：返回当前过滤条件下的全量数据。"""
-    items, total = service.list_entries(page=1, size=10000)
-    return {"module": "door", "total": total, "items": items}
